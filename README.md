@@ -1,8 +1,9 @@
 # Breakpad
 
-完整编译产物，直接将src复制到对应的文件位置
+1.完整编译产物，直接将src复制到对应的文件位置
 
-CMakeLists.txt
+2.CMakeLists.txt代码如下
+```
 cmake_minimum_required(VERSION 3.4.1)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
@@ -76,3 +77,18 @@ target_link_libraries( # Specifies the target library.
         # Links the target library to the log library
         # included in the NDK.
         ${log-lib} )
+```
+3.编写native-lib.cpp初始化
+```
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_jni_JniActivity_initBreakpad(JNIEnv *env, jobject,
+                                              jstring breakpadPath) {
+    const char *path = env->GetStringUTFChars(breakpadPath, JNI_FALSE);
+
+    google_breakpad::MinidumpDescriptor descriptor(path);
+    static google_breakpad::ExceptionHandler eh(descriptor, NULL, DumpCallback, NULL, true, -1);
+
+    env->ReleaseStringUTFChars(breakpadPath, path);
+}
+```
