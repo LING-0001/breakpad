@@ -1,82 +1,78 @@
 # Breakpad
 
-Breakpad is a set of client and server components which implement a
-crash-reporting system.
+完整编译产物，直接将src复制到对应的文件位置
 
-* [Homepage](https://chromium.googlesource.com/breakpad/breakpad/)
-* [Documentation](./docs/)
-* [Bugs](https://bugs.chromium.org/p/google-breakpad/)
-* Discussion/Questions: [google-breakpad-discuss@googlegroups.com](https://groups.google.com/d/forum/google-breakpad-discuss)
-* Developer/Reviews: [google-breakpad-dev@googlegroups.com](https://groups.google.com/d/forum/google-breakpad-dev)
-* Tests: [![Build+Test CI](https://github.com/google/breakpad/actions/workflows/build-test-ci.yml/badge.svg)](https://github.com/google/breakpad/actions/workflows/build-test-ci.yml) [![Build status](https://ci.appveyor.com/api/projects/status/eguv4emv2rhq68u2?svg=true)](https://ci.appveyor.com/project/vapier/breakpad)
-* Coverage [![Coverity Status](https://scan.coverity.com/projects/9215/badge.svg)](https://scan.coverity.com/projects/google-breakpad)
+CMakeLists.txt
+cmake_minimum_required(VERSION 3.4.1)
 
-## Getting started (from main)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 
-1.  First, [download depot_tools](http://dev.chromium.org/developers/how-tos/install-depot-tools)
-    and ensure that they’re in your `PATH`.
+include_directories(    ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/dump_writer_common
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux)
+file(GLOB BREAKPAD_SOURCES_COMMON
+        native-lib.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/crash_generation/crash_generation_client.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/dump_writer_common/thread_info.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/dump_writer_common/ucontext_reader.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/handler/exception_handler.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/handler/minidump_descriptor.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/log/log.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/microdump_writer/microdump_writer.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/minidump_writer/linux_dumper.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/minidump_writer/linux_ptrace_dumper.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/linux/minidump_writer/minidump_writer.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/client/minidump_file_writer.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/convert_UTF.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/md5.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/string_conversion.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/elfutils.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/file_id.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/guid_creator.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/linux_libc_support.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/memory_mapped_file.cc
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/safe_readlink.cc
+)
 
-2.  Create a new directory for checking out the source code (it must be named
-    breakpad).
+file(GLOB BREAKPAD_ASM_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/src/common/linux/breakpad_getcontext.S)
+set_source_files_properties(${BREAKPAD_ASM_SOURCE} PROPERTIES LANGUAGE C)
 
-    ```sh
-    mkdir breakpad && cd breakpad
-    ```
+# Creates and names a library, sets it as either STATIC
+# or SHARED, and provides the relative paths to its source code.
+# You can define multiple libraries, and CMake builds them for you.
+# Gradle automatically packages shared libraries with your APK.
 
-3.  Run the `fetch` tool from depot_tools to download all the source repos.
+add_library( # Sets the name of the library.
+        breakpad
 
-    ```sh
-    fetch breakpad
-    cd src
-    ```
+        # Sets the library as a shared library.
+        SHARED
 
-4.  Build the source.
+        # Provides a relative path to your source file(s).
+        ${BREAKPAD_SOURCES_COMMON} ${BREAKPAD_ASM_SOURCE} )
 
-    ```sh
-    ./configure && make
-    ```
+# Searches for a specified prebuilt library and stores the path as a
+# variable. Because CMake includes system libraries in the search path by
+# default, you only need to specify the name of the public NDK library
+# you want to add. CMake verifies that the library exists before
+# completing its build.
 
-    You can also cd to another directory and run configure from there to build
-    outside the source tree.
+find_library( # Sets the name of the path variable.
+        log-lib
 
-    This will build the processor tools (`src/processor/minidump_stackwalk`,
-    `src/processor/minidump_dump`, etc), and when building on Linux it will
-    also build the client libraries and some tools
-    (`src/tools/linux/dump_syms/dump_syms`,
-    `src/tools/linux/md2core/minidump-2-core`, etc).
+        # Specifies the name of the NDK library that
+        # you want CMake to locate.
+        log )
 
-5.  Optionally, run tests.
+# Specifies libraries CMake should link to your target library. You
+# can link multiple libraries, such as libraries you define in this
+# build script, prebuilt third-party libraries, or system libraries.
 
-    ```sh
-    make check
-    ```
+target_link_libraries( # Specifies the target library.
+        breakpad
 
-6.  Optionally, install the built libraries
-
-    ```sh
-    make install
-    ```
-
-If you need to reconfigure your build be sure to run `make distclean` first.
-
-To update an existing checkout to a newer revision, you can
-`git pull` as usual, but then you should run `gclient sync` to ensure that the
-dependent repos are up-to-date.
-
-## To request change review
-
-1.  Follow the steps above to get the source and build it.
-
-2.  Make changes. Build and test your changes.
-    For core code like processor use methods above.
-    For linux/mac/windows, there are test targets in each project file.
-
-3.  Commit your changes to your local repo and upload them to the server.
-    http://dev.chromium.org/developers/contributing-code
-    e.g. `git commit ... && git cl upload ...`
-    You will be prompted for credential and a description.
-
-4.  At https://chromium-review.googlesource.com/ you'll find your issue listed;
-    click on it, then “Add reviewer”, and enter in the code reviewer. Depending
-    on your settings, you may not see an email, but the reviewer has been
-    notified with google-breakpad-dev@googlegroups.com always CC’d.
+        # Links the target library to the log library
+        # included in the NDK.
+        ${log-lib} )
